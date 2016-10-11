@@ -3,16 +3,16 @@
 #
 #JOOOOOOON
 #TOOOOO DOOOOOO
-#<1> FINISH AREA MAP INIATION
-#<2> FINISH UP AREA MAP SCREEN RENDERING
-#<3> CREATE THE MOB CLASS
-#<4> FIGURE OUT HOW THE HELL SIMULATION WILL WORK
-#
+#1 MAKE USER INPUT FUNCTION DISTINCT AND SANITIZE
+#2 SHIFT THE NEW MOVEMENT CODE SO THAT IT WORKS
+#3 SETUP UP ACTORLIST SYSTEM, INTIALIZE PALYER
+#4 REWRITE GAME LOOP
+#5 IMPROVE MAAAAP?
 #
 
 #import colorama color terminal text features
 from colorama import init
-init()
+init(autoreset = True)
 from colorama import Fore, Back, Style
 
 #getMap
@@ -47,9 +47,12 @@ class Tile:
         self.canSee = canSee #can see through this space, is used for Line of Sight Code whenever I finish that bullfuckery
         self.descript = descript #description of text on Look command, e.g. "grassy ground, walls of sandstone"
         return
-    def renderTile(self, textColor, backColor, styleType, text):
+    def getBackground(self):
+        """Returns the background color for item rendering"""
+        return self.backColor
+    def renderTile(self):
         """most basic rendering tile type"""
-        print(textColor + backColor + styleType + text, end ="")
+        print(self.textColor + self.backColor + self.styleType + self.text, end ="")
         return
     def legalMove(self):
         """Returns whether tile can be moved into(True) or not (False)"""
@@ -89,18 +92,34 @@ class Area:
         for y in range(len(dataMap)):
             for x in range(len(dataMap[0])):
                 key = dataMap[y][x]
-                ###create tile
+                self.areaMap = Tile(textureMap[key][0], textureMap[key][1],
+                                    textureMap[key][2], textureMap[key][3], textureMap[key][4],
+                                    textureMap[key][5], texturemap[key][6])
+        return
+    def renderArea(self,mobList = {}):
+        for y in range(height):
+            for x in range(width):
+                if (y,x) in mobList:
+                    mobList[(y,x)].renderSelf(self.areaMap[y][x].getBackground)
+                else:
+                    areaMap[y][x].renderTile()
+            print()
         return
 
 ###ACTOR CLASS
 ###New thought process - simulation has each actor working by relative speed, player first then everyone else
 
 class Actor:
-    def __init__(self, name, y, x):
+    def __init__(self, name, y, x, text, color, style):
         self.name = name
         self.y = y
         self.x = x
+        self.text = text
+        self.color = color
+        self.style = style
         return
+    def renderSelf(self, background = Back.BLACK):
+        print(self.color + self.style + self.text, end = "")
     def move(self,ny, nx):
         ##called inside the the act system
         self.y = ny
@@ -112,6 +131,37 @@ class Actor:
         ###act() is where the ai lurks
         ###should look into bringing in some sort of scripting or generic system
         return
+
+
+class Player(Actor):
+    def __init__(self, name = "Player", y=1, x=1, text="@", color = Fore.WHITE, style=Style.BRIGHT):
+        self.name = name
+        self.y = y
+        self.x = x
+        self.text = text
+        self.color = color
+        self.style = style
+        return
+    def act(self,area = None, actorList = None):
+        ##########JOOOOON
+        ##########SANATIZE THIS SO THE NEW FUNCTIONS WORK
+        ##########USE THE NEW TILE AND AREA OBJECT FUNCTIONS INSTEAD
+        ##########THEN DEFINE THIS AS A NEW FUNCTION, USER INPUT, WHICH WILL THEN BE CALLED WHENEVER THE PLAYER OBJECT IS CALLED IN MAIN
+        #########
+            while True:
+                move = input("Write where you want to go: <N>orth, <W>est, <E>ast, or <S>outh: ")
+                if move.lower() in ("n", "north") and moveIsLegal(y-1,x,area,texture):
+                    return (y-1,x)
+                elif move.lower() in ("s", "south") and moveIsLegal(y+1,x,area,texture):
+                    return (y+1,x)
+            elif move.lower() in ("w", "west") and moveIsLegal(y,x-1,area,texture):
+                return(y,x-1)
+            elif move.lower() in ("e", "east") and moveIsLegal(y,x+1,area,texture):
+                return(y,x+1)
+            else:
+                print("I'm sorry, that was an invalid command or position")
+        return
+        
 
 #renderTile
 #Renders a single tile
@@ -152,7 +202,7 @@ def moveIsLegal(y,x,area,texture):
 
 def userPrompt(y,x, area, texture):
     while True:
-        move = input("Write where you want to go: <N>orth, <W>est, <E>ast, or <S>outh")
+        move = input("Write where you want to go: <N>orth, <W>est, <E>ast, or <S>outh: ")
         if move.lower() in ("n", "north") and moveIsLegal(y-1,x,area,texture):
             return (y-1,x)
         elif move.lower() in ("s", "south") and moveIsLegal(y+1,x,area,texture):
@@ -162,7 +212,7 @@ def userPrompt(y,x, area, texture):
         elif move.lower() in ("e", "east") and moveIsLegal(y,x+1,area,texture):
             return(y,x+1)
         else:
-            print(Fore.GREEN + "I'm sorry, that was an invalid command or position")
+            print("I'm sorry, that was an invalid command or position")
     return
 
 #World Update
