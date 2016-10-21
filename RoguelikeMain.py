@@ -3,12 +3,15 @@
 #
 #JOOOOOOON
 #TOOOOO DOOOOOO
-#1 MAKE USER INPUT FUNCTION DISTINCT AND SANITIZE
-#2 SHIFT THE NEW MOVEMENT CODE SO THAT IT WORKS
-#3 SETUP UP ACTORLIST SYSTEM, INTIALIZE PALYER
-#4 REWRITE GAME LOOP
-#5 IMPROVE MAAAAP?
-#
+#1 ADD OTHER ENTITIES
+#2 SANITIZE RENDERDICT, MAKE INTERACTIONS WITH OTHER ENTITIES
+#3 ADD MORE OPTIONS FOR MOVEMENT
+#4 ADD OTHER INTERACTION OPTIONS
+#5 ADD WAYS TO GENERATE NEW MAP
+#6 ADD LINE OF SIGHT CODE FOR WALKING AROUND DUNGEON MAPS OR HOSTILE AREAS
+#7 ADD WAYS TO STORE, LOAD MAPS
+#8 ADD WAYS TO STORE, SAVE, LOAD GAME
+#9 ADD TEXT INTERACTIONS
 
 #import colorama color terminal text features
 from colorama import init
@@ -18,16 +21,21 @@ from colorama import Fore, Back, Style
 #getMap
 #Gets map from IO file or if left blank, the default object include here
 #all points are chr() objects that will be refferenced in the texture object for rendering
-basicMap = [[1,1,1,1,1,1,1,1,1,1],
-            [1,0,0,3,3,0,0,0,3,1],
-            [1,0,0,0,0,0,3,0,3,1],
-            [1,0,1,1,1,0,0,0,0,1],
-            [1,0,1,2,1,3,0,3,0,1],
-            [1,0,1,1,1,0,0,0,0,1],
-            [1,0,0,0,4,4,4,4,0,1],
-            [1,0,4,0,3,4,4,4,0,1],
-            [1,0,0,0,3,4,4,4,4,1],
-            [1,1,1,1,1,1,1,1,1,1,]]
+basicMap = [[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,3,3,0,0,4,3,0,3,0,0,0,0,1],
+            [1,0,0,0,0,0,3,4,3,0,0,0,0,3,0,1],
+            [1,0,1,1,1,0,4,4,0,0,0,0,0,0,0,1],
+            [1,0,1,2,1,3,4,3,0,1,1,1,0,0,0,1],
+            [1,0,1,1,1,0,4,0,1,1,5,1,1,3,0,1],
+            [1,0,0,0,4,4,4,0,1,5,5,5,1,0,0,1],
+            [1,0,4,0,3,4,4,0,1,5,5,5,1,0,0,1],
+            [1,0,0,0,3,4,4,0,1,1,0,1,1,0,0,1],
+            [1,0,3,0,3,4,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,3,4,3,0,0,0,0,0,3,0,0,1],
+            [1,0,3,3,0,4,4,0,0,0,0,3,3,3,0,1],
+            [1,0,0,3,0,3,3,0,0,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]
+
 #Texture map
 #{Key : Text Color, Background Color, Style, Text [" " for clean color tile], Can Move To, Can see through, Description
 basicTexture = {0: (Fore.GREEN, Back.GREEN, Style.NORMAL, " ", True, True, "acidic ground riddled with softly callous shiefs of green"), #Grass
@@ -35,15 +43,16 @@ basicTexture = {0: (Fore.GREEN, Back.GREEN, Style.NORMAL, " ", True, True, "acid
                 2: (Fore.BLACK, Back.BLACK, Style.NORMAL, " ", True, True, ""), #Void
                 3: (Fore.GREEN, Back.GREEN, Style.BRIGHT, "T", True,"Lush trees, standing solemn gaurd against heaven"), #Tree
                 4: (Fore.CYAN, Back.BLUE, Style.NORMAL, "~", True, True,"Luscious living waters, blood of the biosphere"), #water
+                5: (Fore.YELLOW, Back.RED, Style.BRIGHT, "-",True, True, "Church floor")
                 }
 class Tile:
     def __init__(self,textColor=Fore.WHITE, backColor = Back.BLACK, styleType=Style.NORMAL, text=".", canWalk = "True", canSee = "False", descript = "Test"):
         """Initializes all of the normal Tile object """
         self.textColor = textColor #Color of rendered text
         self.backColor = backColor #Color of background tile
-        slef.styleType = styleType #type of text style (dim, normal, bright) Note on Windows only Bright and Normal display
+        self.styleType = styleType #type of text style (dim, normal, bright) Note on Windows only Bright and Normal display
         self.text= text #rendered text
-        self.canWalk = canWalk #can walk through/into this space
+        self.canMove = canWalk #can walk through/into this space
         self.canSee = canSee #can see through this space, is used for Line of Sight Code whenever I finish that bullfuckery
         self.descript = descript #description of text on Look command, e.g. "grassy ground, walls of sandstone"
         return
@@ -83,7 +92,7 @@ class Tile:
 
     
 class Area:
-    def __init__(dataMap = basicMap, textureMap = basicTexture):
+    def __init__(self,dataMap = basicMap, textureMap = basicTexture):
         """initalies and creates a map out of a map of data points that are keys in a texture map, defaults to the town test function"""
         self.areaMap = dataMap
         self.textureMap = textureMap
@@ -92,17 +101,18 @@ class Area:
         for y in range(len(dataMap)):
             for x in range(len(dataMap[0])):
                 key = dataMap[y][x]
-                self.areaMap = Tile(textureMap[key][0], textureMap[key][1],
+                self.areaMap[y][x] = Tile(textureMap[key][0], textureMap[key][1],
                                     textureMap[key][2], textureMap[key][3], textureMap[key][4],
-                                    textureMap[key][5], texturemap[key][6])
+                                    textureMap[key][5])
         return
     def renderArea(self,mobList = {}):
-        for y in range(height):
-            for x in range(width):
+        for y in range(self.height):
+            for x in range(self.width):
                 if (y,x) in mobList:
-                    mobList[(y,x)].renderSelf(self.areaMap[y][x].getBackground)
+                    mobList[(y,x)].renderSelf(self.areaMap[y][x].getBackground())
                 else:
-                    areaMap[y][x].renderTile()
+    
+                    self.areaMap[y][x].renderTile()
             print()
         return
 
@@ -119,8 +129,9 @@ class Actor:
         self.style = style
         return
     def renderSelf(self, background = Back.BLACK):
-        print(self.color + self.style + self.text, end = "")
-    def move(self,ny, nx):
+        back = background
+        print(self.color + back + self.style + self.text, end = "")
+    def move(self,ny,nx):
         ##called inside the the act system
         self.y = ny
         self.x = nx
@@ -142,78 +153,43 @@ class Player(Actor):
         self.color = color
         self.style = style
         return
-    def act(self,area = None, actorList = None):
-        ##########JOOOOON
-        ##########SANATIZE THIS SO THE NEW FUNCTIONS WORK
-        ##########USE THE NEW TILE AND AREA OBJECT FUNCTIONS INSTEAD
-        ##########THEN DEFINE THIS AS A NEW FUNCTION, USER INPUT, WHICH WILL THEN BE CALLED WHENEVER THE PLAYER OBJECT IS CALLED IN MAIN
-        #########
-            while True:
-                move = input("Write where you want to go: <N>orth, <W>est, <E>ast, or <S>outh: ")
-                if move.lower() in ("n", "north") and moveIsLegal(y-1,x,area,texture):
-                    return (y-1,x)
-                elif move.lower() in ("s", "south") and moveIsLegal(y+1,x,area,texture):
-                    return (y+1,x)
-            elif move.lower() in ("w", "west") and moveIsLegal(y,x-1,area,texture):
-                return(y,x-1)
-            elif move.lower() in ("e", "east") and moveIsLegal(y,x+1,area,texture):
-                return(y,x+1)
+    def act(self, area = None, actorList = None):
+        while True:
+            move = input("Write where you want to go: <N>orth, <W>est, <E>ast, or <S>outh: ")
+            if move.lower() in ("n", "north") and area.areaMap[self.y-1][self.x].legalMove():
+                self.y += -1
+                return
+            elif move.lower() in ("s", "south") and area.areaMap[self.y+1][self.x].legalMove():
+                self.y += 1
+                return
+            elif move.lower() in ("w", "west") and area.areaMap[self.y][self.x-1].legalMove():
+                self.x += -1
+                return
+            elif move.lower() in ("e", "east") and area.areaMap[self.y][self.x+1].legalMove():
+                self.x += 1
+                return
             else:
-                print("I'm sorry, that was an invalid command or position")
+                print(Fore.RED + Style.DIM + "I'm sorry, that was an invalid command or position")
         return
-        
 
-#renderTile
-#Renders a single tile
-def renderTile(fcolor, bcolor, s, text):
-    print(fcolor + bcolor + s + text, end = Style.RESET_ALL)
-    return
-
-#Rendering Screen
-#Renders action screen BUT NOT UI or Prompt, those will be handeled by renderUI and userPrompt
-#takes dictionary of current items and mobs, and puts their render atributes in a dictionary by (Y,X) coords
-#for every tile to be rendered, check if (X,Y) in the display dictionary, otherwise print normal text object
-#Most difficult bullshit to do tbh
-#Texture used for rendering the area
-def renderScreen(py,px,area = basicMap, items = {}, mobs = {}, texture = basicTexture):
-    """Text Area to render, items and mobile actors(mobs) to be added as needed"""
-    for y in range(len(area)):
-        for x in range(len(area[0])):
-            if (y,x) != (py,px):
-                renderTile(texture[area[y][x]][0], texture[area[y][x]][1], texture[area[y][x]][2],texture[area[y][x]][3])
-            elif (y,x) == (py,px):
-                renderTile(Fore.WHITE, texture[area[y][x]][1], Style.NORMAL,"@")
-        print(Style.RESET_ALL)
-    return
+#Creates actorList for rendering
+def makeActorRenderDict(actorList = []):
+    renderDict = {}
+    for actor in actorList:
+        renderDict[(actor.y,actor.x)] = actor
+    return renderDict
 
 
 #Rendering UI
 #renders the little info textbox after the action map
 def renderUI():
     return
-#understanding user input
-#basic syntax and help functions
-#will be most in-depth bullshit to do
-
-#returns CanMove value based on area, texture
-def moveIsLegal(y,x,area,texture):
-    return texture[area[y][x]][4]
 
 
-def userPrompt(y,x, area, texture):
-    while True:
-        move = input("Write where you want to go: <N>orth, <W>est, <E>ast, or <S>outh: ")
-        if move.lower() in ("n", "north") and moveIsLegal(y-1,x,area,texture):
-            return (y-1,x)
-        elif move.lower() in ("s", "south") and moveIsLegal(y+1,x,area,texture):
-            return (y+1,x)
-        elif move.lower() in ("w", "west") and moveIsLegal(y,x-1,area,texture):
-            return(y,x-1)
-        elif move.lower() in ("e", "east") and moveIsLegal(y,x+1,area,texture):
-            return(y,x+1)
-        else:
-            print("I'm sorry, that was an invalid command or position")
+
+def userPrompt(text = ""):
     return
+
 
 #World Update
 #Takes playerAction, mobs and runs through the ai/effects of each action 
@@ -223,14 +199,14 @@ def main():
     #DO SETUP HERE
     #e.g. read in files, texture, mobs
     #roughshod system for player movement
-    py = 1
-    px = 1
     game = True
+    currentArea = Area()
+    actorList = [Player()]
     while game:
-        renderScreen(py,px)
-        newSpace = userPrompt(py,px,basicMap,basicTexture)
-        py = newSpace[0]
-        px = newSpace[1]
+        renderDict = makeActorRenderDict(actorList)
+        currentArea.renderArea(renderDict)
+        for dude in actorList:
+            dude.act(currentArea,actorList)
     return
 
 main()
