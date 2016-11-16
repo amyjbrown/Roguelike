@@ -3,8 +3,9 @@
 #
 #JOOOOOOON
 #TOOOOO DOOOOOO
-#1 ADD OTHER ENTITIES
-#2 SANITIZE RENDERDICT, MAKE INTERACTIONS WITH OTHER ENTITIES
+#0 MAKE GENERAL INTERACTION INTERFACE
+#1 Done <<ADD OTHER ENTITIES
+#2 DONE <<SANITIZE RENDERDICT, MAKE INTERACTIONS WITH OTHER ENTITIES
 #3 ADD MORE OPTIONS FOR MOVEMENT
 #4 ADD OTHER INTERACTION OPTIONS
 #5 ADD WAYS TO GENERATE NEW MAP
@@ -17,11 +18,14 @@
 from colorama import init
 init(autoreset = True)
 from colorama import Fore, Back, Style
+basicMap = [[1,1,1,1,1,1],
+            [1,0,0,0,0,1],
+            [1,0,0,0,0,1],
+            [1,0,0,0,0,1],
+            [1,0,0,0,0,1],
+            [1,1,1,1,1,1]]
 
-#getMap
-#Gets map from IO file or if left blank, the default object include here
-#all points are chr() objects that will be refferenced in the texture object for rendering
-basicMap = [[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+extracMap = [[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
             [1,0,0,3,3,0,0,4,3,0,3,0,0,0,0,1],
             [1,0,0,0,0,0,3,4,3,0,0,0,0,3,0,1],
             [1,0,1,1,1,0,4,4,0,0,0,0,0,0,0,1],
@@ -105,7 +109,8 @@ class Area:
                                     textureMap[key][2], textureMap[key][3], textureMap[key][4],
                                     textureMap[key][5])
         return
-    def renderArea(self,mobList = {}):
+
+    def render(self,mobList = {}):
         for y in range(self.height):
             for x in range(self.width):
                 if (y,x) in mobList:
@@ -115,6 +120,11 @@ class Area:
                     self.areaMap[y][x].renderTile()
             print()
         return
+    def legalMove(self,y,x):
+        if (y >=0 and y < self.height) and (x >= 0 and x < self.width):
+            return self.areaMap[y][x].legalMove()
+        else:
+            return False
 
 ###ACTOR CLASS
 ###New thought process - simulation has each actor working by relative speed, player first then everyone else
@@ -138,39 +148,98 @@ class Actor:
         return
     def attack(self):
         return
-    def act(self, area=None, actorList=None):
+    def getPos(self):
+        return (self.y, self.x)
+    def switch(self, otherActor):
+        """"switch(otherActor to be switch places)"""
+        new = otherActor.getPos()
+        old = self.getPos()
+        self.move(new[0],new[1])
+        otherActor.move(old[0],old[1])
+        return otherActor
+    def act(self, area, actorList):
         ###act() is where the ai lurks
-        ###should look into bringing in some sort of scripting or generic system
-        return
-
-
+        #walking code man what the fuck yall?
+        ny = self.y
+        nx = self.x+1
+        if area.legalMove(ny, nx):
+            for actor in actorList:
+                if (actor.getPos == (ny,nx) and self != actor):
+                    print(actor.getPos())
+                    print(self.getPos())
+                    actor = self.switch(actor)
+                    print(self.getPos())
+                    print(actor.getPos())
+                    return actorList
+            self.move(self.y,self.x+1)
+            return actorList
+        
+###Class speciiically for player
+###Of primary note is this uses playerInput for it's act()
 class Player(Actor):
-    def __init__(self, name = "Player", y=1, x=1, text="@", color = Fore.WHITE, style=Style.BRIGHT):
+    def __init__(self, name = "Player", y=1, x=1, text="@", color = Fore.WHITE, style=Style.BRIGHT, ID = 0):
         self.name = name
         self.y = y
         self.x = x
         self.text = text
         self.color = color
         self.style = style
+        self.idnum = ID
         return
+    def getID(self):
+        return self.idnum
     def act(self, area = None, actorList = None):
         while True:
-            move = input("Write where you want to go: <N>orth, <W>est, <E>ast, or <S>outh: ")
-            if move.lower() in ("n", "north") and area.areaMap[self.y-1][self.x].legalMove():
-                self.y += -1
-                return
-            elif move.lower() in ("s", "south") and area.areaMap[self.y+1][self.x].legalMove():
-                self.y += 1
-                return
-            elif move.lower() in ("w", "west") and area.areaMap[self.y][self.x-1].legalMove():
-                self.x += -1
-                return
-            elif move.lower() in ("e", "east") and area.areaMap[self.y][self.x+1].legalMove():
-                self.x += 1
-                return
+            move = userPrompt()
+            if move[0] == "m":
+                ny = self.y+move[1][0]
+                nx = self.x+move[1][1]
+                if area.legalMove(ny,nx):
+                    for actor in actorList:
+                        if ((ny, nx) == actor.getPos() and self != actor):
+                            #SWAPS CHARACTERS
+                            print(actor.getPos())
+                            print(self.getPos())
+                            actor = self.switch(actor)
+                            print(Fore.CYAN + Style.DIM + "You switch places with " + actor.name)
+                            print(actor.getPos())
+                            print(self.getPos())
+                            return actorList
+                    self.move(ny,nx)
+                    return actorList
+                else:
+                    print(Fore.RED + Style.DIM + "Ow! You can't walk there")
+            elif move[0] == "l":
+                print(Fore.GREEN + "You stand in the oasis village of Radjemukh")#placer holder
+            elif move[0] == "a":
+                print(Fore.YELLOW + "I'm sorry I haven't implimented this yet")#Placer holder
+            elif move[0] == "h":
+                parseHelp()
+            elif move[0] == "w":
+                return actorList
             else:
-                print(Fore.RED + Style.DIM + "I'm sorry, that was an invalid command or position")
+                print(Fore.RED + Style.DIM + "I do not recognize that command. please enter a valid action")
         return
+
+
+def parseHelp():
+    commandList = """Commands:
+    <A>ttack: Attacks nearby opponents. If multiple nearby, will prompt for target.
+    <L>ook: Describes your location and nearby features you can
+    <?>Help: opens this help menu.
+    Movement:
+    <N>orth, <S>outh, <W>est, <E>ast, <NW> North West, <NE> North East, <SW> South West, <SE> South East
+    Moving in the direction of an item will cause normal interaction, i.e. a trade of blows or talking."""
+    print("Enter a topic, <Q>uit, or Commands")
+    while True:
+        parse = input("Help>> ").lower()
+        if parse in ("command", "commands", "c"):
+            print(Fore.CYAN + Style.DIM + commandList)
+        elif parse in ("exit","q"):
+            return
+        else:
+            print("I don't fucking know")
+    return
 
 #Creates actorList for rendering
 def makeActorRenderDict(actorList = []):
@@ -179,20 +248,90 @@ def makeActorRenderDict(actorList = []):
         renderDict[(actor.y,actor.x)] = actor
     return renderDict
 
+#runSimulation will bite me in the ass
+#YES I CAN FUCKING MODIFY THE LIST MY FOR-LOOP IS BASED ON
+#HAHAHAAHAHA
+####REWRITE ACT() SO THAT IT RETURNS ACTOR LIST
+def runSimulation(actorList = []):
+    renderDict = makeActionRenderDict(actorList)
+    for actor in actorList:
+        actor.act()
 
 #Rendering UI
 #renders the little info textbox after the action map
 def renderUI():
     return
 
-
-
-def userPrompt(text = ""):
+#User prompt
+#Should make action queue?
+#Format:
+#main_loop
+##if queue empty then prompt user for input
+##parse input
+##run actions for all entities
+##remove item from queue
+##Else: don't ask for input, but simply pass next item from queue to player.act()
+#QUESTION: How do deal with potential other problems? e.g. walk north into wall
+##Ambient interupt value? e.g. if Interupt == True, then empty queue and ask for new input in cases where avatar knowledge changes, attacked, illegal actions
+##Is it worth while to skip lots of boring movement
+##OTOH, if you add a wait til healed option this would be necessary
+#Perhaps create an strategy class? e.g. action - arguement(s) - duration; e.g. walk north 5 times => [m, (-1,0), 5] and let the act() function work with input
+def userPrompt():
+    """Takes input, breaks it down and parses it, and then returns what actions the user would like to do"""
+    prompt = input(">>")
+    prompt = prompt.lower()
+    #
+    #       N
+    #       ^
+    #E   <  X >   W
+    #      \/ 
+    #       S
+    #
+    if prompt in ("n", "north"):
+        return ("m", (-1,0)) #(y,x)
+    elif prompt in ("s", "south"):
+        return ("m", (1,0))
+    elif prompt in ("e", "east"):
+        return ("m", (0,1))
+    elif prompt in ("w", "west"):
+        return ("m", (0,-1))
+    elif prompt in ("nw", "north west", "northwest"):
+        return ("m", (-1,-1))
+    elif prompt in ("ne", "north east", "northeast"):
+        return ("m", (-1,1))
+    elif prompt in ("sw", "south west", "southwest"):
+        return ("m", (1,-1))
+    elif prompt in ("se", "south east", "southeast"):
+        return ("m", (1,1))
+    elif prompt in ("?", "help"):
+        return ("h")
+    elif prompt in ("a", "attack"):
+        return ("a")
+    elif prompt in ("l", "look"):
+        return ("l")
+    elif prompt in ("p", "wait"):
+        return ("w")
+    else:
+        return ("x")
     return
 
-
-#World Update
-#Takes playerAction, mobs and runs through the ai/effects of each action 
+class World:
+    def __init__(self,area = None, actorList = []):
+        self.currentArea = area
+        self.areaMatrix = [area]
+        self.actorList = actorList
+        self.level = 0 #Town
+        return
+    def update(self):
+        for actor in self.actorList:
+            self.actorList = actor.act(self.currentArea,self.actorList)
+        return
+    def goLevel():
+        return
+    def renderArea(self):
+        self.currentArea.render(makeActorRenderDict(self.actorList))
+        return
+            
 
 #Main cycle
 def main():
@@ -200,13 +339,13 @@ def main():
     #e.g. read in files, texture, mobs
     #roughshod system for player movement
     game = True
-    currentArea = Area()
-    actorList = [Player()]
+    #currentArea = Area()
+    #actorList = [Player(), Actor(name = "Mister Test Man", y=2, x=2, text = "@", color = Fore.RED, style = Style.BRIGHT, idnum =1)]
+    #walker = Actor(name = "Walker", y=2,x=2,text = "@",color = Fore.CYAN, style = Style.BRIGHT, idnum = 1)
+    world = World(Area(),[Player(y=2,x=3),Actor(name = "Mister Test Man", y=2, x=2, text = "@", color = Fore.RED, style = Style.BRIGHT)])
     while game:
-        renderDict = makeActorRenderDict(actorList)
-        currentArea.renderArea(renderDict)
-        for dude in actorList:
-            dude.act(currentArea,actorList)
+        world.renderArea()
+        world.update()
     return
 
 main()
